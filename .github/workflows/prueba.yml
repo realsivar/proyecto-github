@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Comparar DEV_TOKEN con LOCAL_DEV_TOKEN
-        shell: powershell
+        shell: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}"
         env:
           GH_DEV_TOKEN: ${{ secrets.DEV_TOKEN }}
         run: |
