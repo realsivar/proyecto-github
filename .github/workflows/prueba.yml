@@ -1,0 +1,36 @@
+name: Prueba de tokens en runner local
+
+on: [push]
+
+permissions: {}
+
+jobs:
+  comparar-dev:
+    runs-on: [self-hosted, Windows, X64, practica-actions-raul]
+    timeout-minutes: 5
+
+    steps:
+      - name: Comparar DEV_TOKEN con LOCAL_DEV_TOKEN
+        shell: powershell
+        env:
+          GH_DEV_TOKEN: ${{ secrets.DEV_TOKEN }}
+        run: |
+          Write-Host "Runner: $env:RUNNER_NAME"
+
+          if ([string]::IsNullOrEmpty($env:GH_DEV_TOKEN)) {
+            Write-Host 'ERROR: falta el secret DEV_TOKEN.'
+            exit 1
+          }
+
+          if ([string]::IsNullOrEmpty($env:LOCAL_DEV_TOKEN)) {
+            Write-Host 'ERROR: falta LOCAL_DEV_TOKEN.'
+            exit 1
+          }
+
+          if ($env:GH_DEV_TOKEN -ceq $env:LOCAL_DEV_TOKEN) {
+            Write-Host 'CORRECTO: los valores coinciden.'
+            exit 0
+          }
+
+          Write-Host 'ERROR: los valores no coinciden.'
+          exit 1
