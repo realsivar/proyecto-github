@@ -1,0 +1,74 @@
+name: CI en develop
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  update-readme:
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name != 'pull_request' &&
+       github.ref == 'refs/heads/develop')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - name: Actualizar README
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/update_readme.py ci
+      - name: Mostrar diferencia
+        run: git diff -- README.md
+      - name: Guardar actualizacion
+        if: github.event_name != 'pull_request'
+        env:
+          TARGET_BRANCH: develop
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          if git diff --cached --quiet; then
+            echo 'No hay cambios que guardar.'
+            exit 0
+          fi
+          git commit -m 'docs: actualizar README (ci)'
+          git push origin "HEAD:$TARGET_BRANCH"
+  validate-dev:
+    needs: update-readme
+    runs-on: [self-hosted, Windows, X64, practica-actions-raul]
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Comparar token CI
+        shell: powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{0}"
+        env:
+          GH_EXPECTED_TOKEN: ${{ secrets.DEV_TOKEN }}
+        run: |
+          Write-Host "Runner: $env:RUNNER_NAME"
+          if ([string]::IsNullOrEmpty($env:GH_EXPECTED_TOKEN)) {
+            Write-Host 'ERROR: falta DEV_TOKEN.'
+            exit 1
+          }
+          if ([string]::IsNullOrEmpty($env:LOCAL_DEV_TOKEN)) {
+            Write-Host 'ERROR: falta LOCAL_DEV_TOKEN.'
+            exit 1
+          }
+          if ($env:GH_EXPECTED_TOKEN -ceq $env:LOCAL_DEV_TOKEN) {
+            Write-Host 'CORRECTO: los valores coinciden.'
+            exit 0
+          }
+          Write-Host 'ERROR: los valores no coinciden.'
+          exit 1
